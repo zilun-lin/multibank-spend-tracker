@@ -1,0 +1,26 @@
+[
+  {
+    "category": "Groceries",
+    "pattern": "REWE|EDEKA|ALDI|LIDL|NETTO|KAUFLAND|PENNY|DENNS|ROSSMANN|DM-DROGERIE"
+  },
+  {
+    "category": "Transport",
+    "pattern": "DB VERTRIEB|DEUTSCHE BAHN|BVG|MVG|HVV|FLIXBUS|SHELL|ARAL|BOLT|UBER|TIER|VOI"
+  },
+  {
+    "category": "Bills",
+    "pattern": "STADTWERKE|VATTENFALL|E\\.ON|TELEKOM|VODAFONE|O2|1&1|RUNDFUNK|GEZ"
+  },
+  {
+    "category": "Home & DIY",
+    "pattern": "OBI|BAUHAUS|HORNBACH|IKEA|MEDIAMARKT|SATURN"
+  },
+  {
+    "category": "Tax & admin",
+    "pattern": "FINANZAMT|BUNDESKASSE"
+  },
+  {
+    "category": "Cash",
+    "pattern": "GELDAUTOMAT|BARGELD|AUSZAHLUNG"
+  }
+]

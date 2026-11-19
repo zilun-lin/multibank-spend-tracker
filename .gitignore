@@ -1,0 +1,11 @@
+config/config.json
+*.pem
+*.key
+.env
+data/
+exports/
+dist/
+node_modules/
+*.xlsx
+*.csv
+!examples/*.csv

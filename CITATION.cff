@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+title: "multibank-spend-tracker: customisable multi-bank, multi-currency spending tracker and categoriser for AI agents"
+message: "If you reference this project, please cite it as below."
+type: software
+authors:
+  - name: "multibank-spend-tracker contributors"
+repository-code: "https://github.com/zilun-lin/multibank-spend-tracker"
+license: MIT
+version: 0.3.0
+date-released: 2026-11-19
+keywords: [personal finance, budgeting, open banking, transaction categorisation, Google Sheets, AI agents, MCP]

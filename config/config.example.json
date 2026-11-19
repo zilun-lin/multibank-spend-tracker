@@ -1,0 +1,280 @@
+{
+  "$comment": "Copy to config.json and edit. Patterns are case-insensitive regexes matched against 'MERCHANT DESCRIPTION'. First matching rule wins. This example: home currency GBP, a UK current account and credit card, a multi-currency card, a German (EUR) account, a salary and a freelance side income.",
+  "homeCurrency": "GBP",
+  "fx": {
+    "EUR": 0.85,
+    "USD": 0.78,
+    "CHF": 0.89
+  },
+  "transferPatterns": [
+    "^TO SAVINGS|^FROM SAVINGS|ROUND ?UP",
+    "AMERICAN EXP.*PAYMENT|PAYMENT RECEIVED - THANK YOU",
+    "TOP.?UP|SENT FROM REVOLUT|TO MY ACCOUNT|FROM MY ACCOUNT",
+    "TO JANE DOE|FROM JANE DOE"
+  ],
+  "income": [
+    {
+      "category": "Salary",
+      "pattern": "ACME PAYROLL|SALARY|GEHALT"
+    },
+    {
+      "category": "Side income",
+      "pattern": "INVOICE|STRIPE PAYOUT|ETSY PAYOUT|UPWORK|FREELANCE"
+    },
+    {
+      "category": "Partner contribution",
+      "pattern": "FROM PARTNER NAME"
+    }
+  ],
+  "rules": [
+    {
+      "category": "Business costs",
+      "pattern": "ADOBE|FIGMA|WEB HOSTING|COWORKING|ETSY FEES"
+    },
+    {
+      "category": "Housing costs",
+      "pattern": "GROUND RENT|SERVICE CHARGE|GREENFIELD ESTATES"
+    },
+    {
+      "category": "Insurance",
+      "pattern": "INSURANCE|INSURE"
+    },
+    {
+      "category": "Mortgage",
+      "pattern": "MORTGAGE|BUILDING SOCIETY"
+    },
+    {
+      "category": "Rent",
+      "pattern": "LETTING|RENT TO"
+    },
+    {
+      "category": "Tax & admin",
+      "pattern": "HMRC|COMPANIES HOUSE|FINANZAMT"
+    },
+    {
+      "category": "Bills",
+      "pattern": "ENERGY|WATER|BROADBAND|FIBRE|COUNCIL TAX|MOBILE|STADTWERKE|VATTENFALL|TELEKOM|RUNDFUNK"
+    },
+    {
+      "category": "Home & DIY",
+      "pattern": "IKEA|B&Q|SCREWFIX|TOOLSTATION|DUNELM|CURRYS|OBI|BAUHAUS"
+    },
+    {
+      "category": "Travel & trips",
+      "pattern": "RYANAIR|EASYJET|TAP AIR|BOOKING\\.COM|AIRBNB|TRAVELODGE|HOTEL"
+    },
+    {
+      "category": "Transport",
+      "pattern": "\\bTFL\\b|UBER TRIP|\\bBOLT\\b|TRAINLINE|\\bLIME\\b|DB VERTRIEB|BVG|MVG"
+    },
+    {
+      "category": "Groceries",
+      "pattern": "TESCO|SAINSBURY|LIDL|ALDI|WAITROSE|CO-OP|REWE|EDEKA|NETTO"
+    },
+    {
+      "category": "Eating out",
+      "pattern": "PRET|CAFE|COFFEE|RESTAURANT|PIZZA|DELIVEROO|UBER EATS|PUB|BAKERY"
+    },
+    {
+      "category": "Shopping",
+      "pattern": "AMAZON|AMZN|EBAY"
+    },
+    {
+      "category": "Clothes & personal care",
+      "pattern": "UNIQLO|ZARA|H&M|COS |ARKET|BOOTS|PHARMACY|BARBER"
+    },
+    {
+      "category": "Tech",
+      "pattern": "APPLE\\.COM|GOOGLE STORE|GITHUB"
+    },
+    {
+      "category": "Subscriptions",
+      "pattern": "NETFLIX|SPOTIFY|ICLOUD|OPENAI|PLAN FEE"
+    },
+    {
+      "category": "Leisure",
+      "pattern": "CINEMA|THEATRE|MUSEUM|GYM|CLIMBING"
+    },
+    {
+      "category": "Gifts",
+      "pattern": "FLOWERS|BLOOM|GIFT"
+    },
+    {
+      "category": "Cash",
+      "pattern": "ATM|CASH WITHDRAWAL|GELDAUTOMAT|BARGELD"
+    }
+  ],
+  "overrides": {
+    "example-transaction-id": "Gifts"
+  },
+  "notCounted": [
+    "Mortgage",
+    "Rent",
+    "Tax & admin",
+    "Salary",
+    "Side income",
+    "Partner contribution",
+    "Transfer",
+    "Business costs",
+    "Housing costs"
+  ],
+  "budgets": {
+    "Groceries": 320,
+    "Eating out": 250,
+    "Transport": 150,
+    "Bills": 300,
+    "Shopping": 125,
+    "Home & DIY": 150,
+    "Subscriptions": 50,
+    "Leisure": 80,
+    "Insurance": 40
+  },
+  "annualPots": {
+    "Clothes & personal care": {
+      "amount": 1200,
+      "start": "2026-01-01"
+    },
+    "Travel & trips": {
+      "amount": 3000,
+      "start": "2026-01-01"
+    }
+  },
+  "amortise": [
+    {
+      "$comment": "Spread yearly charges over 12 months. Run `node src/cli.js periodic` to get suggestions.",
+      "pattern": "GROUND RENT|SERVICE CHARGE|GREENFIELD ESTATES",
+      "months": 12
+    },
+    {
+      "pattern": "INSURANCE|TV LICEN|VEHICLE TAX|AMAZON PRIME",
+      "months": 12
+    }
+  ],
+  "nature": [
+    {
+      "nature": "Home investment",
+      "categories": [
+        "Home & DIY"
+      ],
+      "pattern": "FRIDGE|WASHER|DRILL|BOILER|SOFA|BED|DYSON|OVEN|LADDER"
+    },
+    {
+      "nature": "Home setup",
+      "categories": [
+        "Home & DIY"
+      ]
+    },
+    {
+      "nature": "Travel",
+      "categories": [
+        "Travel & trips"
+      ]
+    },
+    {
+      "nature": "Unsorted shopping",
+      "categories": [
+        "Shopping"
+      ],
+      "noItem": true
+    },
+    {
+      "nature": "Big treats",
+      "categories": [
+        "Clothes & personal care",
+        "Eating out",
+        "Leisure",
+        "Shopping",
+        "Gifts",
+        "Tech"
+      ],
+      "minAmount": 60
+    }
+  ],
+  "defaultNature": "Everyday",
+  "refunds": {
+    "windowDays": 60,
+    "pattern": "REFUND|RETURN|REVERSAL|ERSTATTUNG|GUTSCHRIFT"
+  },
+  "recurring": {
+    "minMonths": 3,
+    "maxCv": 0.25,
+    "excludeCategories": [
+      "Eating out",
+      "Groceries",
+      "Transport"
+    ]
+  },
+  "forecast": {
+    "lookbackDays": 120,
+    "lumpyThreshold": 150,
+    "band": 1.28
+  },
+  "tax": {
+    "$comment": "Set aside tax on income not taxed at source. rate = your effective marginal rate on that income (income tax + social contributions). Check current rates for your country; this is arithmetic, not tax advice.",
+    "yearStart": "04-06",
+    "setAside": [
+      {
+        "name": "Freelance side income (self-employed)",
+        "categories": [
+          "Side income"
+        ],
+        "expenseCategories": [
+          "Business costs"
+        ],
+        "rate": 0.28
+      }
+    ]
+  },
+  "otherIncome": [],
+  "fraud": {
+    "largeAmount": 250,
+    "newMerchantMin": 40,
+    "allowMerchants": [],
+    "dismissed": [],
+    "quietAccounts": null
+  },
+  "policy": {
+    "rules": [
+      {
+        "name": "Keep this month's savings positive",
+        "rule": "savingsPositive"
+      },
+      {
+        "name": "48-hour rule for treats over 150",
+        "categories": [
+          "Clothes & personal care",
+          "Tech",
+          "Leisure",
+          "Shopping"
+        ],
+        "minAmount": 150,
+        "rule": "coolingOff",
+        "hours": 48
+      },
+      {
+        "name": "Clothes only from the yearly pot",
+        "categories": [
+          "Clothes & personal care"
+        ],
+        "rule": "withinPot"
+      },
+      {
+        "name": "Home items over 200 must last 5+ years",
+        "categories": [
+          "Home & DIY"
+        ],
+        "minAmount": 200,
+        "rule": "ask",
+        "question": "Will this last 5+ years, and does it replace something or add a new capability?"
+      },
+      {
+        "name": "One in, one out for subscriptions",
+        "categories": [
+          "Subscriptions"
+        ],
+        "rule": "ask",
+        "question": "Which subscription are you cancelling to make room?"
+      }
+    ]
+  }
+}

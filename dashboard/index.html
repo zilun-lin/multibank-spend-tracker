@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spend tracker</title>
+<style>
+  :root { --bg:#fbfaf8; --card:#fff; --ink:#1d1d1b; --muted:#6b6a66; --line:#e6e3dd; --accent:#2f6fb3; --band:#2f6fb31f; --over:#b5452f; --ok:#2e7d4f;
+          --n1:#2f6fb3; --n2:#d08a2c; --n3:#3f9c8a; --n4:#9a5fb0; --n5:#c4534f; --n6:#8a8a84; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151514; --card:#1e1e1c; --ink:#ecebe7; --muted:#a3a29c; --line:#34332f; --accent:#6aa3e0; --band:#6aa3e026; --over:#e07a62; --ok:#6cc08f;
+          --n1:#6aa3e0; --n2:#e3a64f; --n3:#5fc0ad; --n4:#bb8ad0; --n5:#e07a75; --n6:#a3a29c; } }
+  * { box-sizing:border-box } body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--ink) }
+  header { padding:20px 24px 8px; display:flex; flex-wrap:wrap; gap:12px; align-items:baseline; justify-content:space-between }
+  h1 { font-size:20px; margin:0 } h2 { font-size:14px; margin:0 0 10px; font-weight:600 } .muted { color:var(--muted) }
+  main { padding:8px 24px 40px; display:grid; gap:16px; grid-template-columns:repeat(12, 1fr) }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; grid-column:span 12 }
+  @media (min-width:900px) { .s4 { grid-column:span 4 } .s6 { grid-column:span 6 } .s8 { grid-column:span 8 } }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px }
+  .tile .v { font-size:24px; font-weight:600; font-variant-numeric:tabular-nums } .tile .l { color:var(--muted); font-size:12px }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums } td, th { padding:6px 4px; border-bottom:1px solid var(--line); text-align:left } th { color:var(--muted); font-weight:500; font-size:12px }
+  td.n, th.n { text-align:right } .over { color:var(--over) } .ok { color:var(--ok) }
+  .bar { height:8px; border-radius:4px; background:var(--line); position:relative; overflow:hidden } .bar > i { position:absolute; inset:0 auto 0 0; background:var(--accent); border-radius:4px } .bar.o > i { background:var(--over) }
+  .drop { border:1.5px dashed var(--line); border-radius:10px; padding:18px; text-align:center; color:var(--muted) }
+  .legend { display:flex; flex-wrap:wrap; gap:12px; font-size:12px; color:var(--muted); margin-top:6px } .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px }
+  svg text { fill:var(--muted); font-size:11px } .tip { position:fixed; pointer-events:none; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:12px; display:none; box-shadow:0 2px 8px #0002 }
+  pre { white-space:pre-wrap; margin:0; font:13px/1.5 system-ui }
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Spend tracker</h1><div class="muted" id="sub">Load your data to begin.</div></div>
+  <div class="muted" id="asof"></div>
+</header>
+<main id="app">
+  <div class="card drop" id="drop">
+    Drop <b>transactions.csv</b> (and optionally <b>receipt-items.csv</b> and <b>config.json</b>) here, or
+    <input type="file" id="files" multiple accept=".csv,.json">.<br>
+    Or set <code>dataUrl</code> in config to a Google Sheet published as CSV.
+  </div>
+</main>
+<div class="tip" id="tip"></div>
+<script src="../src/engine.js"></script>
+<script>
+/* Data sources, in order: window.__SPEND__ (embedded by build.js), config.dataUrl, dropped files. */
+const E = window.SpendEngine;
+const state = { config: null, tx: null, receipts: [] };
+const fmt = v => (v < 0 ? '−' : '') + Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 });
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const tip = document.getElementById('tip');
+function showTip(e, html) { tip.innerHTML = html; tip.style.display = 'block'; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; }
+function hideTip() { tip.style.display = 'none'; }
+
+async function boot() {
+  const emb = window.__SPEND__;
+  if (emb) { state.config = emb.config; state.tx = E.normaliseRows(emb.transactions, emb.config); state.receipts = emb.receipts || []; return render(); }
+  try { state.config = await (await fetch('config.json')).json(); } catch { try { state.config = await (await fetch('../config/config.example.json')).json(); } catch { state.config = {}; } }
+  if (state.config.dataUrl) {
+    try {
+      state.tx = E.normaliseRows(E.parseCSV(await (await fetch(state.config.dataUrl)).text()), state.config);
+      if (state.config.receiptsUrl) state.receipts = E.parseCSV(await (await fetch(state.config.receiptsUrl)).text());
+      return render();
+    } catch (e) { document.getElementById('sub').textContent = 'Could not load dataUrl: ' + e.message; }
+  }
+}
+document.getElementById('files').addEventListener('change', e => loadFiles(e.target.files));
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); loadFiles(e.dataTransfer.files); });
+async function loadFiles(files) {
+  for (const f of files) {
+    const text = await f.text();
+    if (f.name.endsWith('.json')) state.config = JSON.parse(text);
+    else if (/receipt|item/i.test(f.name)) state.receipts = E.parseCSV(text);
+    else state.txRaw = E.parseCSV(text);
+  }
+  if (state.txRaw) state.tx = E.normaliseRows(state.txRaw, state.config || {});
+  if (state.tx) render();
+}
+
+function render() {
+  const cfg = E.withDefaults(state.config);
+  const asOf = state.config.asOf || state.tx.map(t => t.date).sort().pop();
+  const L = E.enrich(state.tx, state.receipts, cfg);
+  const S = E.summarise(L, cfg, asOf);
+  const F = E.forecast(L, cfg, asOf);
+  const R = E.recurring(L, cfg);
+  const A = E.anomalies(L, cfg, asOf).filter(a => a.severity !== 'low' || a.signals.includes('priceCreep'));
+  document.getElementById('sub').textContent = `${state.tx.length} transactions · ${new Set(state.tx.map(t => t.account)).size} accounts · ${new Set(state.tx.map(t => t.currency)).size} currencies · amounts in ${cfg.homeCurrency}`;
+  document.getElementById('asof').textContent = 'as of ' + asOf;
+  const cf = S.cashflow; const gap = S.forecast.projected - S.monthlyBudget;
+  const app = document.getElementById('app');
+  app.innerHTML = `
+  <section class="card"><div class="tiles">
+    ${tile('Spent this month', fmt(S.spentMonthlyPots), `budget ${fmt(S.monthlyBudget)}`)}
+    ${tile('Projected month end', fmt(S.forecast.projected), `likely ${fmt(S.forecast.low)}–${fmt(S.forecast.high)} · <span class="${gap > 0 ? 'over' : 'ok'}">${gap > 0 ? fmt(gap) + ' over' : fmt(-gap) + ' under'}</span>`)}
+    ${tile('Yearly-pot spend this month', fmt(S.spentAnnualPots), 'judged against yearly allowance')}
+    ${tile('Spendable income (last 31 days)', fmt(cf.income), cf.taxSetAside > 0 ? `${fmt(cf.grossIncome)} in − ${fmt(cf.taxSetAside)} set aside for tax · tax pot this year ${fmt(cf.taxReserveYtd)}` : 'after tax set-asides')}
+    ${tile('Projected saved this month', fmt(cf.projectedSaved), cf.crossDay ? `<span class="over">goes negative ${cf.crossDay}</span>` : 'stays positive')}
+  </div></section>
+  <section class="card s8"><h2>Pace this month</h2><div id="pace"></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>actual</span><span><i style="background:var(--band)"></i>forecast, ~80% range</span><span><i style="background:var(--muted)"></i>budget</span></div></section>
+  <section class="card s4"><h2>Why (plain language)</h2><pre>${esc(E.explain(S))}</pre></section>
+  <section class="card s6"><h2>Budgets</h2>${budgetTable(S.budgets)}</section>
+  <section class="card s6"><h2>Kind of spending by month</h2><div id="nature"></div><div class="legend" id="natureLegend"></div></section>
+  <section class="card s6"><h2>Largest items this month</h2>${topTable(S.top)}</section>
+  <section class="card s6"><h2>Recurring charges</h2>${recTable(R)}</section>
+  <section class="card"><h2>Check these <span class="muted" style="font-weight:400">— possible fraud, double charges, price rises (last 60 days)</span></h2>${flagTable(A)}</section>
+  <section class="card"><h2>Recent transactions</h2>${recentTable(L.filter(r => !r.alloc).slice(0, 40))}</section>`;
+  paceChart(document.getElementById('pace'), L, F, S.monthlyBudget, asOf);
+  natureChart(document.getElementById('nature'), document.getElementById('natureLegend'), L, asOf);
+}
+const tile = (l, v, s) => `<div class="tile"><div class="l">${l}</div><div class="v">${v}</div><div class="l">${s}</div></div>`;
+function budgetTable(b) {
+  return `<table><tr><th>Category</th><th></th><th class="n">Spent</th><th class="n">Allowance</th></tr>` + b.map(x => {
+    const cap = x.type === 'annual' ? x.accrued : x.budget; const p = Math.min(100, 100 * x.spent / (cap || 1));
+    return `<tr><td>${esc(x.category)}${x.type === 'annual' ? ' <span class="muted">(yearly)</span>' : ''}</td><td style="width:30%"><div class="bar ${x.over ? 'o' : ''}"><i style="width:${p}%"></i></div></td><td class="n ${x.over ? 'over' : ''}">${fmt(x.spent)}</td><td class="n">${fmt(cap)}${x.type === 'annual' ? `<span class="muted"> of ${fmt(x.budget)}</span>` : ''}</td></tr>`;
+  }).join('') + '</table>';
+}
+const topTable = t => `<table><tr><th>Date</th><th>Item / merchant</th><th>Kind</th><th class="n">Amount</th></tr>` + t.map(r => `<tr><td>${r.date.slice(5)}</td><td>${esc(r.item || r.merchant)}<div class="muted">${esc(r.category)}</div></td><td>${esc(r.nature)}</td><td class="n">${fmt(r.amount)}</td></tr>`).join('') + '</table>';
+const recTable = r => r.length ? `<table><tr><th>Merchant</th><th>Category</th><th class="n">Day</th><th class="n">Typical</th></tr>` + r.map(x => `<tr><td>${esc(x.merchant)}</td><td>${esc(x.category)}</td><td class="n">${x.day}</td><td class="n">${fmt(x.typical)}</td></tr>`).join('') + '</table>' : '<div class="muted">None detected yet (needs 3+ months).</div>';
+const flagTable = a => a.length ? `<table><tr><th>Date</th><th>Account</th><th>Merchant</th><th class="n">Amount</th><th>Why</th><th></th></tr>` + a.map(x => `<tr><td>${x.date}</td><td class="muted">${esc(x.account)}</td><td>${esc(x.merchant)}</td><td class="n">${fmt(x.amount)}</td><td>${esc(x.reasons.join(' '))}</td><td class="${x.severity === 'high' ? 'over' : 'muted'}">${x.severity}</td></tr>`).join('') + '</table>' : '<div class="muted">Nothing unusual.</div>';
+const recentTable = L => `<table><tr><th>Date</th><th>Account</th><th>Merchant</th><th>Category</th><th class="n">Amount</th></tr>` + L.map(r => `<tr><td>${r.date}</td><td class="muted">${esc(r.account)}</td><td>${esc(r.item ? r.item + ' · ' + r.merchant : r.merchant)}${r.refund ? ' <span class="ok">refund</span>' : ''}${r.amortised ? ` <span class="muted">spread over ${r.amortised.months} months</span>` : ''}</td><td class="${r.category === 'Uncategorised' ? 'over' : ''}">${esc(r.category)}${r.counted ? '' : ' <span class="muted">(not counted)</span>'}</td><td class="n">${r.currency !== E.withDefaults(state.config).homeCurrency ? `<span class="muted">${r.amount} ${r.currency} · </span>` : ''}${fmt(-r.spend)}</td></tr>`).join('') + '</table>';
+
+function paceChart(el, L, F, budget, asOf) {
+  const W = el.clientWidth || 600, H = 240, P = { l: 44, r: 12, t: 10, b: 24 };
+  let cum = 0; const actual = []; const byDay = {};
+  L.filter(r => r.counted && r.pot !== 'annual' && r.month === F.month).forEach(r => byDay[r.effDate] = (byDay[r.effDate] || 0) + r.spend);
+  F.days.forEach(d => { if (d.date <= asOf) { cum += byDay[d.date] || 0; actual.push([d.date, cum]); } });
+  let e = cum, v = 0; const fut = [[asOf, cum, cum, cum]];
+  F.days.filter(d => d.date > asOf).forEach(d => { e += d.expected; v += d.everydayVar; const s = 1.28 * Math.sqrt(v); fut.push([d.date, e, Math.max(cum, e - s), e + s]); });
+  const maxY = Math.max(budget, ...fut.map(f => f[3]), cum) * 1.08; const n = F.days.length;
+  const x = d => P.l + (W - P.l - P.r) * (parseInt(d.slice(8)) - 1) / (n - 1); const y = v => H - P.b - (H - P.t - P.b) * v / maxY;
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(t => t * maxY);
+  el.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Cumulative spend this month with forecast">
+    ${ticks.map(t => `<line x1="${P.l}" x2="${W - P.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)"/><text x="${P.l - 6}" y="${y(t) + 4}" text-anchor="end">${fmt(t)}</text>`).join('')}
+    <polygon fill="var(--band)" points="${fut.map(f => `${x(f[0])},${y(f[3])}`).join(' ')} ${fut.slice().reverse().map(f => `${x(f[0])},${y(f[2])}`).join(' ')}"/>
+    <polyline fill="none" stroke="var(--accent)" stroke-dasharray="4 4" stroke-width="2" points="${fut.map(f => `${x(f[0])},${y(f[1])}`).join(' ')}"/>
+    <line x1="${P.l}" x2="${W - P.r}" y1="${y(budget)}" y2="${y(budget)}" stroke="var(--muted)" stroke-dasharray="2 3"/><text x="${W - P.r}" y="${y(budget) - 4}" text-anchor="end">budget ${fmt(budget)}</text>
+    <polyline fill="none" stroke="var(--accent)" stroke-width="2" points="${actual.map(a => `${x(a[0])},${y(a[1])}`).join(' ')}"/>
+    ${[1, 8, 15, 22, n].map(d => `<text x="${x(F.month + '-' + String(d).padStart(2, '0'))}" y="${H - 6}" text-anchor="middle">${d}</text>`).join('')}
+    <rect id="hit" x="${P.l}" y="${P.t}" width="${W - P.l - P.r}" height="${H - P.t - P.b}" fill="transparent"/></svg>`;
+  el.querySelector('#hit').addEventListener('mousemove', ev => {
+    const r = ev.target.getBoundingClientRect(); const i = Math.round((ev.clientX - r.left) / r.width * (n - 1)); const d = F.days[Math.max(0, Math.min(n - 1, i))].date;
+    const a = actual.find(q => q[0] === d), f = fut.find(q => q[0] === d);
+    showTip(ev, `<b>${d}</b><br>${a ? 'actual ' + fmt(a[1]) : `forecast ${fmt(f[1])}<br><span class="muted">${fmt(f[2])}–${fmt(f[3])}</span>`}`);
+  });
+  el.querySelector('#hit').addEventListener('mouseleave', hideTip);
+}
+
+function natureChart(el, legend, L, asOf) {
+  const months = [...new Set(L.filter(r => r.counted && r.month <= asOf.slice(0, 7)).map(r => r.month))].sort().slice(-6);
+  const kinds = [...new Set(L.filter(r => r.counted && r.nature).map(r => r.nature))];
+  const cols = ['--n1', '--n2', '--n3', '--n4', '--n5', '--n6'];
+  const data = months.map(m => kinds.map(k => Math.max(0, L.filter(r => r.counted && r.month === m && r.nature === k).reduce((s, r) => s + r.spend, 0))));
+  const W = el.clientWidth || 500, H = 220, P = { l: 44, r: 8, t: 8, b: 22 };
+  const max = Math.max(1, ...data.map(d => d.reduce((a, b) => a + b, 0))) * 1.05;
+  const bw = (W - P.l - P.r) / months.length; const y = v => (H - P.t - P.b) * v / max;
+  let bars = '';
+  data.forEach((d, i) => { let acc = 0; d.forEach((v, k) => { if (v <= 0) return; const h = y(v); bars += `<rect x="${P.l + i * bw + bw * 0.2}" y="${H - P.b - y(acc) - h}" width="${bw * 0.6}" height="${Math.max(0, h - 2)}" rx="2" fill="var(${cols[k % cols.length]})" data-t="${esc(months[i])} · ${esc(kinds[k])}: ${fmt(v)}"/>`; acc += v; }); });
+  el.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Spending by kind per month">${[0, 0.5, 1].map(t => `<line x1="${P.l}" x2="${W - P.r}" y1="${H - P.b - y(t * max)}" y2="${H - P.b - y(t * max)}" stroke="var(--line)"/><text x="${P.l - 6}" y="${H - P.b - y(t * max) + 4}" text-anchor="end">${fmt(t * max)}</text>`).join('')}${bars}${months.map((m, i) => `<text x="${P.l + i * bw + bw / 2}" y="${H - 6}" text-anchor="middle">${m.slice(2)}</text>`).join('')}</svg>`;
+  el.querySelectorAll('rect').forEach(r => { r.addEventListener('mousemove', e => showTip(e, r.dataset.t)); r.addEventListener('mouseleave', hideTip); });
+  legend.innerHTML = kinds.map((k, i) => `<span><i style="background:var(${cols[i % cols.length]})"></i>${esc(k)}</span>`).join('');
+}
+boot();
+</script>
+</body>
+</html>

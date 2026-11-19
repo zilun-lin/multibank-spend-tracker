@@ -1,0 +1,4 @@
+Transaction ID,Date,Merchant,Payment,Item,Qty,Price,Category,Nature,Source
+LU-00228,2026-11-06,Amazon,96.47,Cordless drill,1,64.99,Home & DIY,Home investment,email receipt
+LU-00228,2026-11-06,Amazon,96.47,Phone case,1,24.99,Tech,,email receipt
+LU-00228,2026-11-06,Amazon,96.47,Batteries AA x8,1,6.49,Shopping,,email receipt
