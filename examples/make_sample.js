@@ -45,6 +45,16 @@ add('2026-11-15', 'UK Credit Card', -64.00, 'GBP', 'PIZZA PLACE', 'dup', 'Lunch 
 add('2026-11-15', 'UK Credit Card', -64.00, 'GBP', 'PIZZA PLACE', 'dup', 'Lunch Flow');           // double charge
 add('2026-11-12', 'EU Current', -145.00, 'EUR', 'VIAGOGO', 'Tickets', 'Enable Banking');           // risky merchant, quiet account
 add('2026-11-09', 'UK Credit Card', -13.99, 'GBP', 'NETFLIX.COM', 'price up', 'Lunch Flow');      // price creep (replaces usual)
+// Money owed to you: a parents' visit (15-19 Oct), wedding deposits, a loan repaid in cash
+add('2026-10-06', 'Multi-currency', -186.0, 'GBP', 'BOOKING.COM', 'Hotel for parents visit', 'Enable Banking');   // booked before the window: ask
+add('2026-10-17', 'UK Credit Card', -112.0, 'GBP', 'RIVERSIDE RESTAURANT', 'Family dinner', 'Lunch Flow');
+add('2026-09-05', 'UK Current', -600.0, 'GBP', 'PHOTOGRAPHY STUDIO', 'Wedding deposit', 'Lunch Flow');           // tracker: paid by Me
+add('2026-09-06', 'UK Current', -1500.0, 'GBP', 'COUNTRY MARQUEE HIRE', 'Wedding deposit', 'Lunch Flow');        // tracker: paid by someone else
+add('2026-10-15', 'UK Current', -250.0, 'GBP', 'BLOOMS FLORIST', 'Wedding flowers deposit', 'Lunch Flow');      // not in tracker: ask
+add('2026-09-14', 'EU Current', 2000.0, 'EUR', 'CASH DEPOSIT', 'Repayment', 'Enable Banking');
+add('2026-09-16', 'EU Current', -2000.0, 'EUR', 'EXCHANGED TO GBP', '', 'Enable Banking');
+add('2026-10-07', 'EU Current', 1500.0, 'EUR', 'CASH DEPOSIT', 'Repayment', 'Enable Banking');
+add('2026-10-15', 'EU Current', -1500.0, 'EUR', 'EXCHANGED TO GBP', '', 'Enable Banking');
 const out = rows.map(r => r.map(c => /[",]/.test(c) ? `"${c}"` : c).join(',')).join('\n') + '\n';
 fs.writeFileSync(path.join(__dirname, 'sample-transactions.csv'), out);
 

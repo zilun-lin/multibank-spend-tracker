@@ -34,6 +34,8 @@ Source: https://github.com/zilun-lin/multibank-spend-tracker (MIT)
 | How do I automatically spot fraudulent or duplicate charges across all my banks? | [recipe](docs/recipes/spot-fraudulent-or-duplicate-charges.md) |
 | How much of my side income or freelance money can I actually spend after tax? | [recipe](docs/recipes/side-income-tax-set-aside.md) |
 | How do I spread yearly bills like ground rent or insurance across months? | [recipe](docs/recipes/spread-yearly-bills.md) |
+| How do I track money family or friends owe me without it counting as my spending? | [recipe](docs/recipes/money-owed-to-you.md) |
+| How do I backfill history from a bank statement export without duplicates? | [recipe](docs/recipes/backfill-from-bank-statement-export.md) |
 | How does this compare with Tiller, Actual, Firefly III, YNAB, Snoop or PocketSmith? | [comparison](docs/alternatives.md) |
 
 ## Who it's for
@@ -62,6 +64,8 @@ It works just as well for a single country. The multi-region pain is simply wher
 | A yearly bill (ground rent, insurance) makes one month look terrible | **Amortisation** spreads it over its 12 months. The billing period is read from the demand email when the name says nothing, and `periodic` suggests candidates. |
 | "Income" that's partly the taxman's | **Tax set-aside**: (income − allowable expenses) × your rate. Shows gross, set aside, spendable and a year-to-date tax pot, for any country's tax year. Built for freelancers, sole traders and side income. |
 | A stolen card or double charge goes unnoticed until the statement | **Fraud watch** across all banks: card testing, duplicates, risky merchant types, spend on normally quiet accounts, new-currency and price-rise alerts. A daily job alerts once per new flag. |
+| Paying for a family visit, a wedding or a loan makes your month look like a spending spree | **Money owed to you**: time-bound and standing rules mark those payments as receivables (out of budgets, still in cash flow). A shared tracker's "paid by" column decides shared costs. Repayments, even cash deposited abroad and converted later, are valued at the rate they actually converted and set against what's outstanding. |
+| A new account only shows two weeks of history | Per-account first sync (~90 days), plus `import.js` to backfill from the bank's own export with IDs that match the live feed. |
 | Should I buy this? | A purchase check against your budget, yearly pots, forecast and your own written policy, with a clear verdict. |
 | When does this month's saving go negative? | A cash-flow line shows money in (including foreign rent net of tax) against money out, and the day savings go negative. |
 
@@ -134,7 +138,8 @@ feeds ─► Google Sheet ─► engine (src/engine.js) ─► dashboard / CLI /
 | Path | What |
 |---|---|
 | `src/engine.js` | Categorisation, refunds, receipts, budgets, forecast, recurring detection, cash flow, explanations |
-| `src/cli.js` | `explain`, `summary`, `check` (can I buy this?), `anomalies` (fraud watch), `periodic` (yearly bills), `ledger`, `recurring`, `uncategorised` |
+| `src/cli.js` | `explain`, `summary`, `check` (can I buy this?), `owed` (money owed to you), `anomalies` (fraud watch), `periodic` (yearly bills), `ledger`, `recurring`, `uncategorised` |
+| `src/import.js` | Backfill from a bank statement export (CSV/TSV/"xls"), decimal commas, Latin-1, feed-compatible IDs, dedupe |
 | `mcp/server.js` | MCP server (stdio) exposing the engine as tools |
 | `config/rules/` | Country rule packs (UK, DE); contributions welcome |
 | `docs/recipes/` | One question per page, end to end |
@@ -227,7 +232,7 @@ Keep `config.json` out of any public repo. It contains names and merchants.
 
 ## 6. Answering questions later
 
-Load `skills/finance-assistant/SKILL.md` for questions about the past and present, `skills/personal-cfo/SKILL.md` for "can I buy this?", `skills/fraud-watch/SKILL.md` for suspicious charges, and `skills/finance-dashboard-design/SKILL.md` before changing the pipeline or dashboard. Install them into the platform's skills or instructions so future chats find them. Ask the user for their spending policy and write it into `config.policy`. Prefer `node src/cli.js explain`/`summary` over mental arithmetic. If the user corrects something ("that was a gift", "my parents owe me that"), fix it with `overrides` or a rule, or record it as money owed, then re-run.
+Load `skills/finance-assistant/SKILL.md` for questions about the past and present, `skills/personal-cfo/SKILL.md` for "can I buy this?", `skills/fraud-watch/SKILL.md` for suspicious charges, and `skills/finance-dashboard-design/SKILL.md` before changing the pipeline or dashboard. Install them into the platform's skills or instructions so future chats find them. Ask the user for their spending policy and write it into `config.policy`. Prefer `node src/cli.js explain`/`summary` over mental arithmetic. If the user corrects something ("that was a gift", "my parents owe me that"), fix it with `overrides` or a rule, or record it as money owed (`config.owed`: rules, `statuses`, `loans`, `repayments`; see docs/recipes/money-owed-to-you.md), then re-run. If a newly linked account has little history, backfill it from the bank's export with `node src/import.js` (docs/recipes/backfill-from-bank-statement-export.md).
 
 ## Tools you can call
 
@@ -374,6 +379,21 @@ node src/cli.js uncategorised --tx export.csv --config config/config.json
 
 Work down the list. Twenty rules usually cover 90% of spend. Use `\b` word boundaries for short tokens (`\bTFL\b`, so that "NETFLIX" doesn't match).
 
+## Money owed to you (`owed`)
+
+Payments you make for other people are receivables, not spending. See [the recipe](recipes/money-owed-to-you.md) for the full walk-through.
+
+| Key | Meaning |
+|---|---|
+| `me` | Your name as it appears in a shared tracker's "paid by" column (default `Me`). |
+| `category` | Category given to owed payments (default `Paid for others (owed)`); they are not counted in budgets. |
+| `rules[]` | First match wins. `from`/`to` (+`graceDays`, default 1) for a window; `prebookDays` + `prebookCategories` mark earlier bookings as **ask**; `until` + `pattern`/`categories` for standing rules; `ids` for agreed one-offs; `excludePattern`, `account`, `share` (default 1), `status` (default `owed`), `payerCheck`. |
+| `payers[]` | `{ pattern | id, payer }` from a shared tracker. With `payerCheck`, only payments you made are owed; others are **not owed**; missing → **ask**. Also loadable with `cli.js owed --payers file.csv`. |
+| `statuses` | `{ transactionId: "owed" | "ask" | "not owed" }`. Always wins. |
+| `loans[]` | `{ name, date, amount }` in home currency. |
+| `repayments` | `{ pattern, account?, from?, appliesTo? }` credits that are repayments (not income). |
+| `conversions` | `{ pattern?, account?, list? }` how foreign repayments became home currency; valued first in, first out. `list` items: `{ date, foreign, home }`. |
+
 
 ---
 
@@ -500,6 +520,52 @@ Example questions once it's set up: "Why am I over budget this month?", "Can I b
 
 ---
 
+<!-- file: docs/recipes/backfill-from-bank-statement-export.md -->
+
+# How do I backfill months of history from a bank statement export without duplicating my live feed?
+
+**Short answer:** download the bank's own export (CSV, or the ".xls" many European banks send, which is usually tab-separated text), run `node src/import.js` on it with the date range the feed is missing, and append the output to your feed tab. If your aggregator builds transaction IDs from the bank's running entry number, give the importer one overlapping row as an anchor and every imported row gets exactly the ID the feed would give it, so a later re-sync never duplicates it.
+
+## Why feeds have gaps
+
+- **Newly linked accounts.** Open-banking consents usually allow about 90 days of history on the first fetch. A sync script that decides "first run or not" for the whole sheet, instead of per account, gives an account linked later only the daily lookback (often 14 days). The Apps Script connector here checks per account; older copies may not.
+- **Consent limits.** Some banks cap history at 90 days, full stop.
+- **Accounts with no feed at all.**
+
+## Run it
+
+```bash
+node src/import.js --file export.xls --account "EU Current" --currency EUR \
+  --to 2026-11-02 --existing feed.csv > backfill.csv
+```
+
+It finds the date, description and amount columns by name in English, Portuguese, German, Spanish and Dutch headers; handles decimal commas (`-1.200,00`), Latin-1 files, and separate debit/credit columns; and keeps the bank's other date (operation vs booking) in the description.
+
+### Avoiding duplicates
+
+A feed and an export describe the same payment with different text (`TRF.IPS P/ JANE DOE` vs `TRF.IPS P/ JANE DOE 6730081…`), so matching on description fails. Two defences, use both:
+
+1. **`--existing feed.csv`** drops export rows with the same account and amount within 3 days of a feed row.
+2. **Sync-compatible IDs.** Enable Banking and some others build IDs like `<prefix><account><yyyymmdd><15-digit entry number>`. The entry number is the bank's running count of movements, so it can be derived from the export's row order. Pick a row present in both, then:
+
+   ```bash
+   node src/import.js --file export.xls --account "EU Current" \
+     --id-prefix EB-<account number> --anchor "2026-11-18|SUPERMARKT|1042"
+   ```
+
+   `--anchor` is `date|text that appears in the export row|entry number from the feed's ID`. Verify two or three other overlapping rows get the same IDs as the feed before trusting it; if they don't, drop the ID options and rely on `--existing`.
+
+Use `--to` to stop where the live feed starts and `--from` to match the history your other accounts have, so every account covers the same period (otherwise month comparisons are wrong).
+
+## After importing
+
+- Append to the feed tab (the importer marks rows `Statement export` in the Source column).
+- Re-run `cli.js uncategorised`: bank exports often use different wording from the feed (`COMPRA` prefixes, truncated names), so a couple of rules may need widening.
+- Re-run `owed` and `periodic`: old cash deposits and yearly bills now have evidence.
+
+
+---
+
 <!-- file: docs/recipes/eu-banks-revolut-to-google-sheets-free.md -->
 
 # How do I connect Revolut or other EU banks to Google Sheets for free?
@@ -553,6 +619,67 @@ Also useful if you used Nordigen with Actual Budget or Firefly III: Lunch Flow o
 4. The dashboard's "most expensive items each week" and the category totals then use the items.
 
 **Safety:** the job is read-only on mail (it never sends, labels, archives or deletes), edits one tab, and ignores instructions inside emails. **Second mailbox:** forward `category:purchases` from it with a Gmail filter.
+
+
+---
+
+<!-- file: docs/recipes/money-owed-to-you.md -->
+
+# How do I track money family or friends owe me, without it counting as my spending?
+
+**Short answer:** treat what you pay on someone else's behalf as a **receivable**, not an expense. Write a few rough rules ("everything during my parents' visit, 15–19 Oct", "wedding payments I make myself", "the £5,000 loan"), let the engine mark matching payments as owed, and record repayments when they arrive, valued at the rate they actually converted at. Owed payments drop out of your budgets but stay in cash flow, so your spending numbers are true and you can see what's still outstanding.
+
+## Why this matters
+
+Hosting a family visit, paying a wedding deposit for the family, or lending a relative money makes your month look like a spending spree. It isn't: the money is coming back. If you count it as spending, the budget is wrong now; if you simply delete it, you lose track of what you're owed. The accounting answer is the one companies use: Dr *Receivable* / Cr *Bank* when you pay, and Dr *Bank* / Cr *Receivable* when you're repaid.
+
+## The rules (`config.owed`)
+
+```json
+"owed": {
+  "me": "Me",
+  "rules": [
+    { "name": "Parents' visit", "from": "2026-10-15", "to": "2026-10-19", "graceDays": 1,
+      "prebookDays": 14, "prebookCategories": ["Travel & trips"],
+      "categories": ["Eating out", "Travel & trips", "Transport", "Leisure"], "excludePattern": "BAKERY" },
+    { "name": "Wedding", "until": "2027-06-12", "pattern": "WEDDING|MARQUEE|PHOTOGRAPHY STUDIO|FLORIST", "payerCheck": true },
+    { "name": "Agreed one-offs", "ids": ["<transaction id>"] }
+  ],
+  "payers":   [ { "pattern": "MARQUEE", "payer": "Partner's parent" }, { "pattern": "PHOTOGRAPHY STUDIO", "payer": "Me" } ],
+  "statuses": { "<transaction id>": "not owed" },
+  "loans":    [ { "name": "Loan", "date": "2026-08-03", "amount": 5000 } ],
+  "repayments":  { "pattern": "CASH DEPOSIT", "account": "EU Current", "from": "2026-08-03", "appliesTo": "Loan" },
+  "conversions": { "pattern": "EXCHANGED TO GBP" }
+}
+```
+
+- **Time-bound rules** (`from`/`to`) cover a visit or trip. Card payments can post a day late, so `graceDays` (default 1) extends the window. Hotels and flights are often booked before the visit starts; payments in `prebookCategories` within `prebookDays` before `from` are marked **ask**, not owed, so you confirm them once.
+- **Standing rules** (`until` + `pattern` or `categories`) cover something ongoing, like a wedding. Open-ended rules must say what they cover; a rule that would match everything is ignored.
+- **Who paid.** For shared costs, the bank feed can't tell you whose money it was. With `payerCheck`, a payment counts as owed only if a shared tracker (a wedding or trip spreadsheet's "paid by" column) says you paid. Someone else → **not owed**; not in the tracker → **ask**. Load the tracker with `--payers payers.csv` (columns `pattern,payer`) or put rows in `owed.payers`.
+- **Your decisions win.** `statuses` by transaction ID overrides any rule, so "no, only the flights are owed" sticks.
+- **Loans** are owed amounts with no card payment behind them.
+
+## Repayments that arrive indirectly
+
+Family rarely repay by neat bank transfer. A common path: cash handed over → deposited into a foreign account → moved to a multi-currency account → converted → into your main account. Count the repayment **once, at the point it enters** (the cash deposit), and ignore the later hops, which are transfers between your own accounts.
+
+The deposit is in a foreign currency, so what you actually got back is what it converted to. `owedReport` values each deposit **first in, first out** against later conversions (`conversions.pattern`, or an explicit `conversions.list` of `{date, foreign, home}` when you know the realised amounts from a statement). Anything not converted yet uses today's rate and is marked provisional.
+
+Don't let a rule mistake your own money for a repayment: transfers you make from your own savings or rent income into the same account are not repayments. Keep the repayment pattern narrow (the bank's wording for a cash deposit, say), and check the first few by hand.
+
+## Use it
+
+```bash
+node src/cli.js owed --tx feed.csv [--payers wedding-payers.csv]
+```
+
+Returns every owed item with its rule and status, every repayment with its realised value, and per rule: owed, to confirm, repaid, outstanding. The dashboard shows an "Owed to you" tile and table; the MCP tool is `spend_owed`; the `finance-assistant` skill answers "how much does my family still owe me?".
+
+## Pitfalls
+
+- **Gifts aren't repayments.** Money someone gives you towards an event isn't them repaying you; leave it out of the repayment pattern.
+- **Fees count.** A bank fee on a payment you made for someone is part of what they owe; a rule that matches the payment's description usually catches its fee line too, if the fee has the same reference.
+- **Re-check after people correct you.** The first pass of any rule is a draft. Put corrections in `statuses`, not in ever-more-complicated patterns.
 
 
 ---
@@ -779,8 +906,10 @@ Never record card numbers, account numbers, API keys or private keys.
 - **"How much do I really earn a month?" / "How much of my side income can I spend?"** Use `node src/cli.js summary` → `cashflow`: gross income, the tax set aside on income not taxed at source (`config.tax.setAside`: side income, freelance, rental; `(income − allowable expenses) × rate`), and the spendable amount. Add the year-to-date tax pot (`taxReserve`). Say that the rate is the user's own choice and this is not tax advice.
 - **"Can I afford X?"** Use the personal-cfo skill.
 - **Yearly bills** (ground rent, insurance): these are spread over 12 months by `amortise` rules or by bill periods in the `Periods` tab. If a big one-off payment to a company isn't spread, run `node src/cli.js periodic` and ask whether it's a yearly bill.
+- **"How much does my family still owe me?"** Run `node src/cli.js owed` (MCP `spend_owed`). Report outstanding per rule (visit, wedding, loan), repayments received with the GBP they actually converted to, and the items marked **ask** for the user to confirm. Owed payments are already out of the spending numbers; don't subtract them twice. For shared costs, the shared tracker's "paid by" column decides; if a payment isn't in it, ask.
 - **"Anything suspicious?"** Use the fraud-watch skill.
-- **Corrections** ("that was a gift", "my parents owe me for that"): propose the exact `overrides` entry or rule, and apply it if you have write access.
+- **Corrections** ("that was a gift", "my parents owe me for that", "no, only the flights are owed"): propose the exact `overrides` entry, `owed.statuses` entry or rule, and apply it if you have write access. Prefer a status by transaction ID over a cleverer pattern. Money someone gives towards an event is a gift, not a repayment; the user's own transfers between accounts (rent moved from abroad, savings) are never repayments.
+- **Gaps in history** (a newly linked account shows only a couple of weeks): suggest `node src/import.js` on the bank's own export; see docs/recipes/backfill-from-bank-statement-export.md.
 
 ## Never
 
@@ -875,6 +1004,8 @@ These are lessons from building one across UK and EU accounts. Most finance dash
 - **Key on the feed's own transaction id, prefixed by source** (`EB-`, `ST-`). If there isn't one, hash account + date + amount + description.
 - **Ingest booked items only.** Pending transactions often change id, or amount, when they book. Taking both creates duplicates.
 - **Re-read a trailing window** (about 14 days) on every run, then skip ids you've seen. Banks book late.
+- **Decide "first run" per account, not per sheet.** A new account linked after others needs its full first-run history (~90 days); a global "is the tab empty?" check silently gives it only the trailing window.
+- **Backfilling from a statement export:** the export's wording differs from the feed's, so dedupe on account + amount + date (±3 days), and where the feed's IDs are built from the bank's running entry number, rebuild the same IDs from row order with one verified anchor row.
 - **The same money appears in two places.** A credit-card repayment is a debit on the current account and a credit on the card. Pot moves, top-ups and currency exchanges are the same. Treat both sides as transfers. Repayment rows often have odd merchant codes; find them by looking at the card's credits.
 - **Split rows are children.** Once a payment is split into receipt items, every view must use either the parent or the children, never both. Weekly "biggest payments" views merge children back into the parent.
 - **Refund pairing is one-to-one.** Once a purchase is fully refunded, it can't absorb a second refund.
@@ -925,6 +1056,14 @@ Recognising them takes three kinds of evidence, strongest first:
 3. **Cadence:** the same payee 330–400 days apart with stable amounts. This is impossible in year one with a 90-day backfill.
 
 The usual miss is a bank transfer to a company whose name says nothing (`TO XYZ ESTATES LIMITED`), when the receipt job only searches *purchases* and skips transfers. Add a bill-period step that searches demands and invoices for one-off payments of at least ~100 to companies. Whatever is still unclear, ask the user once and turn the answer into a rule.
+
+## 6c. Money owed to you is not spending
+
+- Payments made for others (a visit you hosted, family wedding deposits, a loan) are **receivables**: out of budgets and spending charts, still in cash flow, and shown as an "owed to you" balance.
+- Identify them from rough rules the user states: **time-bound** windows (with a grace day for late posting, and pre-trip bookings marked "ask"), **standing** rules (a wedding until its date), explicit one-offs, and loans. The user's corrections by transaction ID always win.
+- **Shared costs need a payer source of truth.** If several people pay suppliers for the same event, read the shared tracker's "paid by" column; only the user's own payments are owed to them. Not in the tracker → ask.
+- **Recognise a repayment once, where it enters** (e.g. a cash deposit), never again on the hops that follow (moving it between your own accounts, converting it). Value foreign repayments at the rate they actually converted, first in first out; mark unconverted ones provisional.
+- Don't let a pattern turn the user's own money (rent from abroad, savings) or gifts into "repayments". Check the first few by hand.
 
 ## 7. Forecast, not a straight line
 
@@ -997,6 +1136,7 @@ This works with any assistant that can (a) run on a schedule, (b) read and write
 06:00  bank_sync.gs (Apps Script trigger)     → writes "Bank feed", "Sync status"
 06:xx  Lunch Flow (its own schedule)           → writes "Transactions"
 07:15  AI job: receipt enrichment              → waits for fresh "Sync status", writes "Receipt items" + "Periods"
+07:20  AI job: money owed                     → after receipts: marks new owed items from config.owed rules (ask when unsure), records new repayments; never changes a status the user set
 07:30  AI job: fraud watch                     → after receipts (so receipts clear false alarms), writes "Flags", alerts on new high/medium
 07:45  AI job (optional): rebuild + publish    → node src/build.js … → publish as artifact/canvas
 any    You: "why am I over budget?"            → agent loads the skill, runs cli.js explain or reads the dashboard

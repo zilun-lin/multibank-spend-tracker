@@ -123,6 +123,7 @@
     otherIncome: [],
     tax: { yearStart: '01-01', setAside: [] },
     amortise: [],
+    owed: null,
   };
   function withDefaults(config) {
     const c = Object.assign({}, DEFAULTS, config || {});
@@ -173,6 +174,7 @@
       });
     });
     pairRefunds(rows, cfg);
+    applyOwed(rows, cfg);
     const split = splitByReceipts(rows, receipts || [], cfg);
     split.forEach(r => { r.month = monthOf(r.effDate); r.nature = natureOf(r, cfg); r.pot = cfg.annualPots[r.category] ? 'annual' : 'monthly'; });
     const out = amortiseRows(split, cfg);
@@ -654,5 +656,117 @@
       .sort((a, b) => b.score - a.score || (a.date < b.date ? 1 : -1));
   }
 
-  return { amortiseRows, detectPeriodic, taxReserve, anomalies, checkPurchase, parseCSV, normaliseRows, merchantKey, classifyOne, enrich, pairRefunds, splitByReceipts, natureOf, budgetStatus, recurring, forecast, cashflow, summarise, explain, withDefaults, monthOf };
+  // ------------------------------------------------------------------ money owed to you (receivables)
+  /**
+   * Paying for someone else is not your spending: it is money you are owed.
+   * config.owed = {
+   *   me: 'Me',                                   // your name in any "paid by" source
+   *   category: 'Paid for others (owed)',
+   *   rules: [                                    // first match wins
+   *     { name, from?, to?, until?, graceDays?, prebookDays?, prebookCategories?,
+   *       pattern?, excludePattern?, categories?, account?, ids?, share?, status?,
+   *       payerCheck? }                            // payerCheck: only owed if payers says you paid
+   *   ],
+   *   payers: [ { pattern | id, payer } ],        // e.g. rows from a shared wedding/trip tracker
+   *   statuses: { '<transaction id>': 'owed' | 'ask' | 'not owed' },   // your decisions win
+   *   loans: [ { name, date, amount } ],          // money lent directly, in home currency
+   *   repayments: { pattern, account?, from?, appliesTo? },   // e.g. cash deposits
+   *   conversions: { pattern?, account?, list?: [ { date, foreign, home } ] }   // realised FX, FIFO
+   * }
+   * Owed rows stay in cash flow but leave budgets (kind 'receivable', counted false);
+   * repayment credits get kind 'repayment' and are not income.
+   */
+  function owedRuleMatch(rule, r, text) {
+    if (rule.ids) return rule.ids.includes(r.id) ? 'in' : null;
+    if (rule.account && !re(rule.account).test(r.account || '')) return null;
+    if (rule.excludePattern && re(rule.excludePattern).test(text)) return null;
+    const filtersOk = (!rule.pattern || re(rule.pattern).test(text)) && (!rule.categories || rule.categories.includes(r.category));
+    const d = r.date;
+    if (rule.from && rule.to) {
+      const end = addDays(rule.to, rule.graceDays == null ? 1 : rule.graceDays);
+      if (d >= rule.from && d <= end) return filtersOk ? 'in' : null;
+      const pre = rule.prebookDays ? addDays(rule.from, -rule.prebookDays) : null;
+      if (pre && d >= pre && d < rule.from && (rule.prebookCategories || []).includes(r.category) && (!rule.pattern || re(rule.pattern).test(text))) return 'prebook';
+      return null;
+    }
+    if (rule.from && d < rule.from) return null;
+    if (rule.until && d > rule.until) return null;
+    if (!rule.pattern && !rule.categories) return null;   // open-ended rules must say what they cover
+    return filtersOk ? 'in' : null;
+  }
+
+  function applyOwed(rows, cfg) {
+    const O = cfg.owed; if (!O) return;
+    const me = (O.me || 'Me').toLowerCase();
+    const statuses = O.statuses || {};
+    const payers = O.payers || [];
+    const cat = O.category || 'Paid for others (owed)';
+    for (const r of rows) {
+      if (r.kind !== 'spend' || r.amountHome >= 0) continue;
+      const text = textOf(r);
+      let rule = null, how = null;
+      for (const ru of O.rules || []) { how = owedRuleMatch(ru, r, text); if (how) { rule = ru; break; } }
+      if (!rule && !statuses[r.id]) continue;
+      let status = rule ? (how === 'prebook' ? 'ask' : (rule.status || 'owed')) : 'owed';
+      let note = how === 'prebook' ? 'booked before the window; confirm it is for the trip' : '';
+      if (rule && rule.payerCheck) {
+        const p = payers.find(x => (x.id && x.id === r.id) || (x.pattern && re(x.pattern).test(text)));
+        if (!p) { status = 'ask'; note = 'no payer found in the shared tracker'; }
+        else if (String(p.payer).toLowerCase() !== me) { status = 'not owed'; note = 'paid by ' + p.payer + ' per shared tracker'; }
+      }
+      if (statuses[r.id]) { status = statuses[r.id]; note = note || 'your decision'; }
+      r.owedRule = rule ? rule.name : 'Agreed one-offs';
+      r.owedStatus = status; r.owedShare = rule && rule.share != null ? rule.share : 1; r.owedNote = note;
+      if (status === 'owed') Object.assign(r, { kind: 'receivable', category: cat, counted: false, why: 'owed: ' + r.owedRule });
+    }
+    const R = O.repayments;
+    if (R && R.pattern) for (const r of rows) {
+      if (r.amountHome <= 0 || (R.from && r.date < R.from)) continue;
+      if (R.account && !re(R.account).test(r.account || '')) continue;
+      if (!re(R.pattern).test(textOf(r))) continue;
+      Object.assign(r, { kind: 'repayment', category: 'Repayment', counted: false, repayTo: R.appliesTo || 'Loan', why: 'repayment pattern', refund: null });
+    }
+  }
+
+  /** Realised home-currency value of foreign repayments, first in first out against later conversions. */
+  function valueRepayments(reps, ledger, cfg) {
+    const O = cfg.owed || {}; const C = O.conversions || {};
+    let convs = (C.list || []).map(c => ({ date: c.date, left: Math.abs(+c.foreign), foreign: Math.abs(+c.foreign), home: Math.abs(+c.home) }));
+    if (!convs.length && C.pattern) convs = ledger.filter(r => !r.parent && r.currency !== cfg.homeCurrency && r.amount < 0 && re(C.pattern).test(textOf(r)) && (!C.account || re(C.account).test(r.account || '')))
+      .map(r => ({ date: r.date, left: -r.amount, foreign: -r.amount, home: -r.amountHome }));
+    convs.sort((a, b) => (a.date < b.date ? -1 : 1));
+    return reps.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).map(r => {
+      const foreign = r.currency !== cfg.homeCurrency ? r.amount : 0;
+      if (!foreign || !convs.length) return { date: r.date, id: r.id, foreign: foreign || null, home: round2(r.amountHome), provisional: !!foreign, appliesTo: r.repayTo };
+      let need = foreign, home = 0, used = [];
+      for (const c of convs) { if (need <= 0) break; if (c.left <= 0 || c.date < r.date) continue; const take = Math.min(need, c.left); home += take / c.foreign * c.home; c.left -= take; need -= take; used.push(c.date); }
+      if (need > 0) home += need * (r.amountHome / r.amount);
+      return { date: r.date, id: r.id, foreign: round2(foreign), home: round2(home), provisional: need > 0, convertedOn: used, appliesTo: r.repayTo };
+    });
+  }
+
+  /** What you are owed, what has come back and what is outstanding, per rule and loan. */
+  function owedReport(ledger, config) {
+    const cfg = withDefaults(config); const O = cfg.owed;
+    if (!O) return { items: [], repayments: [], summary: [], total: { owed: 0, ask: 0, repaid: 0, outstanding: 0 } };
+    const byId = {};
+    ledger.filter(r => r.owedRule && !r.alloc).forEach(r => {
+      const id = r.parent || r.id;
+      const it = byId[id] = byId[id] || { id, date: r.date, account: r.account, merchant: r.merchant || r.description, amount: 0, rule: r.owedRule, share: r.owedShare, status: r.owedStatus, note: r.owedNote };
+      it.amount = round2(it.amount + (r.spend || -r.amountHome));
+    });
+    const items = Object.values(byId).map(it => Object.assign(it, { owed: round2(it.amount * it.share) })).sort((a, b) => (a.date < b.date ? -1 : 1));
+    const repayments = valueRepayments(ledger.filter(r => r.kind === 'repayment' && !r.alloc), ledger, cfg);
+    const S = {};
+    const row = n => (S[n] = S[n] || { name: n, owed: 0, ask: 0, repaid: 0 });
+    (O.loans || []).forEach(l => { row(l.name).owed += +l.amount; });
+    (O.rules || []).forEach(ru => row(ru.name));
+    items.forEach(it => { if (it.status === 'owed') row(it.rule).owed += it.owed; else if (it.status === 'ask') row(it.rule).ask += it.owed; });
+    repayments.forEach(p => { row(p.appliesTo || 'Loan').repaid += p.home; });
+    const summary = Object.values(S).map(s => ({ name: s.name, owed: round2(s.owed), ask: round2(s.ask), repaid: round2(s.repaid), outstanding: round2(s.owed - s.repaid) }));
+    const total = summary.reduce((t, s) => ({ owed: round2(t.owed + s.owed), ask: round2(t.ask + s.ask), repaid: round2(t.repaid + s.repaid), outstanding: round2(t.outstanding + s.outstanding) }), { owed: 0, ask: 0, repaid: 0, outstanding: 0 });
+    return { items, repayments, summary, total };
+  }
+
+  return { owedReport, applyOwed, amortiseRows, detectPeriodic, taxReserve, anomalies, checkPurchase, parseCSV, normaliseRows, merchantKey, classifyOne, enrich, pairRefunds, splitByReceipts, natureOf, budgetStatus, recurring, forecast, cashflow, summarise, explain, withDefaults, monthOf };
 });

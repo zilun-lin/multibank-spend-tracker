@@ -1,6 +1,6 @@
 {
   "name": "multibank-spend-tracker",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Customisable spending tracker and transaction categoriser for multiple banks and countries (UK + EU, multi-currency). Free bank feeds to Google Sheets (Enable Banking, Starling, Lunch Flow, CSV), refund netting, email-receipt itemisation, yearly budgets for lumpy spend, forecasts, an MCP server and AI-agent skills.",
   "main": "src/engine.js",
   "bin": {
@@ -69,7 +69,12 @@
     "transaction-categorization",
     "truelayer-alternative",
     "uk",
-    "wise"
+    "wise",
+    "receivables",
+    "money owed",
+    "iou tracker",
+    "bank statement import",
+    "family loan tracker"
   ],
   "license": "MIT",
   "engines": {

@@ -33,6 +33,7 @@ const TOOLS = [
   { name: 'spend_anomalies', description: 'Fraud and anomaly watch over the last 60 days: first-time merchants with large charges, duplicate charges, card-testing patterns (tiny then bigger charge), spend on normally quiet accounts, risky merchant types (resale tickets, gift cards, crypto, money transfer, betting), unusual currency, subscription price rises. Returns flags with severity and reasons.', inputSchema: { type: 'object', properties: pathArgs } },
   { name: 'spend_periodic', description: 'Yearly or quarterly charges (ground rent, insurance, annual subscriptions) that should be spread across months, with evidence and a ready-made amortise rule. Payments to a payee seen only once need confirmation from an email/invoice period or the user.', inputSchema: { type: 'object', properties: pathArgs } },
   { name: 'spend_tax', description: 'Tax set-aside on income not taxed at source (side income, freelance/sole trader, rental): gross, allowable expenses, taxable, reserve and spendable, year to date and last 31 days.', inputSchema: { type: 'object', properties: pathArgs } },
+  { name: 'spend_owed', description: 'Money owed to you: payments you made for family or friends under time-bound or standing rules (a visit, a wedding, a loan), whether a shared tracker says you were the payer, repayments received (valued at the rate they actually converted), and the outstanding balance per rule. Owed payments are excluded from your spending.', inputSchema: { type: 'object', properties: pathArgs } },
   { name: 'spend_recurring', description: 'Detected recurring charges (subscriptions, bills) with typical amount and day of month.', inputSchema: { type: 'object', properties: pathArgs } },
   { name: 'spend_uncategorised', description: 'Merchants no categorisation rule matched, most frequent first, to help write new rules.', inputSchema: { type: 'object', properties: pathArgs } },
   { name: 'spend_ledger', description: 'Enriched ledger rows (category, nature, counted, refund links, why) for a month, as JSON. Use month YYYY-MM.', inputSchema: { type: 'object', properties: Object.assign({ month: { type: 'string' } }, pathArgs) } },
@@ -61,6 +62,7 @@ function call(name, a) {
     case 'spend_anomalies': return E.anomalies(ledger, config, asOf);
     case 'spend_periodic': return E.detectPeriodic(ledger, config);
     case 'spend_tax': return E.taxReserve(ledger, config, asOf);
+    case 'spend_owed': return E.owedReport(ledger, config);
     case 'spend_recurring': return E.recurring(ledger, config);
     case 'spend_uncategorised': {
       const n = {};

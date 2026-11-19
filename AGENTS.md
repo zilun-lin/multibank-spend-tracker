@@ -52,7 +52,7 @@ Keep `config.json` out of any public repo. It contains names and merchants.
 
 ## 6. Answering questions later
 
-Load `skills/finance-assistant/SKILL.md` for questions about the past and present, `skills/personal-cfo/SKILL.md` for "can I buy this?", `skills/fraud-watch/SKILL.md` for suspicious charges, and `skills/finance-dashboard-design/SKILL.md` before changing the pipeline or dashboard. Install them into the platform's skills or instructions so future chats find them. Ask the user for their spending policy and write it into `config.policy`. Prefer `node src/cli.js explain`/`summary` over mental arithmetic. If the user corrects something ("that was a gift", "my parents owe me that"), fix it with `overrides` or a rule, or record it as money owed, then re-run.
+Load `skills/finance-assistant/SKILL.md` for questions about the past and present, `skills/personal-cfo/SKILL.md` for "can I buy this?", `skills/fraud-watch/SKILL.md` for suspicious charges, and `skills/finance-dashboard-design/SKILL.md` before changing the pipeline or dashboard. Install them into the platform's skills or instructions so future chats find them. Ask the user for their spending policy and write it into `config.policy`. Prefer `node src/cli.js explain`/`summary` over mental arithmetic. If the user corrects something ("that was a gift", "my parents owe me that"), fix it with `overrides` or a rule, or record it as money owed (`config.owed`: rules, `statuses`, `loans`, `repayments`; see docs/recipes/money-owed-to-you.md), then re-run. If a newly linked account has little history, backfill it from the bank's export with `node src/import.js` (docs/recipes/backfill-from-bank-statement-export.md).
 
 ## Tools you can call
 

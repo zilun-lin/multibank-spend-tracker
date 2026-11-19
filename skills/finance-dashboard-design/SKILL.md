@@ -23,6 +23,8 @@ These are lessons from building one across UK and EU accounts. Most finance dash
 - **Key on the feed's own transaction id, prefixed by source** (`EB-`, `ST-`). If there isn't one, hash account + date + amount + description.
 - **Ingest booked items only.** Pending transactions often change id, or amount, when they book. Taking both creates duplicates.
 - **Re-read a trailing window** (about 14 days) on every run, then skip ids you've seen. Banks book late.
+- **Decide "first run" per account, not per sheet.** A new account linked after others needs its full first-run history (~90 days); a global "is the tab empty?" check silently gives it only the trailing window.
+- **Backfilling from a statement export:** the export's wording differs from the feed's, so dedupe on account + amount + date (±3 days), and where the feed's IDs are built from the bank's running entry number, rebuild the same IDs from row order with one verified anchor row.
 - **The same money appears in two places.** A credit-card repayment is a debit on the current account and a credit on the card. Pot moves, top-ups and currency exchanges are the same. Treat both sides as transfers. Repayment rows often have odd merchant codes; find them by looking at the card's credits.
 - **Split rows are children.** Once a payment is split into receipt items, every view must use either the parent or the children, never both. Weekly "biggest payments" views merge children back into the parent.
 - **Refund pairing is one-to-one.** Once a purchase is fully refunded, it can't absorb a second refund.
@@ -73,6 +75,14 @@ Recognising them takes three kinds of evidence, strongest first:
 3. **Cadence:** the same payee 330–400 days apart with stable amounts. This is impossible in year one with a 90-day backfill.
 
 The usual miss is a bank transfer to a company whose name says nothing (`TO XYZ ESTATES LIMITED`), when the receipt job only searches *purchases* and skips transfers. Add a bill-period step that searches demands and invoices for one-off payments of at least ~100 to companies. Whatever is still unclear, ask the user once and turn the answer into a rule.
+
+## 6c. Money owed to you is not spending
+
+- Payments made for others (a visit you hosted, family wedding deposits, a loan) are **receivables**: out of budgets and spending charts, still in cash flow, and shown as an "owed to you" balance.
+- Identify them from rough rules the user states: **time-bound** windows (with a grace day for late posting, and pre-trip bookings marked "ask"), **standing** rules (a wedding until its date), explicit one-offs, and loans. The user's corrections by transaction ID always win.
+- **Shared costs need a payer source of truth.** If several people pay suppliers for the same event, read the shared tracker's "paid by" column; only the user's own payments are owed to them. Not in the tracker → ask.
+- **Recognise a repayment once, where it enters** (e.g. a cash deposit), never again on the hops that follow (moving it between your own accounts, converting it). Value foreign repayments at the rate they actually converted, first in first out; mark unconverted ones provisional.
+- Don't let a pattern turn the user's own money (rent from abroad, savings) or gifts into "repayments". Check the first few by hand.
 
 ## 7. Forecast, not a straight line
 

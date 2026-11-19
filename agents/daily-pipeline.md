@@ -8,6 +8,7 @@ This works with any assistant that can (a) run on a schedule, (b) read and write
 06:00  bank_sync.gs (Apps Script trigger)     → writes "Bank feed", "Sync status"
 06:xx  Lunch Flow (its own schedule)           → writes "Transactions"
 07:15  AI job: receipt enrichment              → waits for fresh "Sync status", writes "Receipt items" + "Periods"
+07:20  AI job: money owed                     → after receipts: marks new owed items from config.owed rules (ask when unsure), records new repayments; never changes a status the user set
 07:30  AI job: fraud watch                     → after receipts (so receipts clear false alarms), writes "Flags", alerts on new high/medium
 07:45  AI job (optional): rebuild + publish    → node src/build.js … → publish as artifact/canvas
 any    You: "why am I over budget?"            → agent loads the skill, runs cli.js explain or reads the dashboard

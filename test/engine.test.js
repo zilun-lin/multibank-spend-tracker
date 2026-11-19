@@ -135,3 +135,58 @@ test('an explicit bill period from an email beats rules and spreads over its own
   assert.strictEqual(alloc.map(r => r.month).sort()[0], '2026-07');
   assert.strictEqual(L2.find(r => r.id === 'X-1').amortised.source, 'email');
 });
+
+test('money owed: time-bound window, prebooking, payer check, statuses, loans and FIFO repayments', () => {
+  const cfgO = JSON.parse(JSON.stringify(config));
+  const rows = [
+    ['DE Current', '2026-10-05', -300, 'EUR', 'HOTEL SEASIDE', 'booked for the visit'],
+    ['UK Current', '2026-10-16', -84.5, 'GBP', 'THE GOOD RESTAURANT', ''],
+    ['UK Current', '2026-10-17', -6.2, 'GBP', 'LOCAL BAKERY', ''],
+    ['UK Current', '2026-10-27', -40, 'GBP', 'THE GOOD RESTAURANT', 'after the visit'],
+    ['UK Current', '2026-09-01', -500, 'GBP', 'PHOTOGRAPHY STUDIO', 'wedding deposit'],
+    ['UK Current', '2026-09-02', -900, 'GBP', 'COUNTRY MARQUEE HIRE', 'wedding deposit'],
+    ['UK Current', '2026-09-03', -120, 'GBP', 'WEDDING CAKES LTD', 'deposit'],
+    ['DE Current', '2026-09-14', 3000, 'EUR', 'CASH DEPOSIT', ''],
+    ['DE Current', '2026-09-16', -2000, 'EUR', 'EXCHANGED TO GBP', ''],
+    ['DE Current', '2026-09-30', -1000, 'EUR', 'EXCHANGED TO GBP', ''],
+  ].map((r, i) => ({ id: 'o' + i, account: r[0], date: r[1], amount: r[2], currency: r[3], merchant: r[4], description: r[5], amountHome: r[3] === 'EUR' ? Math.round(r[2] * 85) / 100 : r[2] }));
+  cfgO.owed.conversions = { list: [{ date: '2026-09-16', foreign: 2000, home: 1720 }, { date: '2026-09-30', foreign: 1000, home: 850 }] };
+  cfgO.transferPatterns = [];
+  cfgO.owed.repayments.account = 'DE Current';
+  cfgO.owed.statuses = { o3: 'owed' };
+  const L = E.enrich(rows, [], cfgO);
+  const by = id => L.find(r => r.id === id);
+  assert.strictEqual(by('o1').kind, 'receivable');
+  assert.strictEqual(by('o1').counted, false, 'owed spending leaves budgets');
+  assert.strictEqual(by('o0').owedStatus, 'ask', 'booking before the window is asked about');
+  assert.ok(!by('o2').owedRule, 'excluded pattern stays your spending');
+  assert.strictEqual(by('o3').owedStatus, 'owed', 'your decision wins');
+  assert.strictEqual(by('o4').owedStatus, 'owed', 'tracker says you paid');
+  assert.strictEqual(by('o5').owedStatus, 'not owed', 'tracker says someone else paid');
+  assert.strictEqual(by('o5').counted, true, 'not owed stays in your spending');
+  assert.strictEqual(by('o6').owedStatus, 'ask', 'no payer in tracker');
+  assert.strictEqual(by('o7').kind, 'repayment');
+  const R = E.owedReport(L, cfgO);
+  const s = n => R.summary.find(x => x.name === n);
+  assert.strictEqual(R.repayments[0].home, 2570, 'repayment valued at realised rates, FIFO across conversions');
+  assert.strictEqual(R.repayments[0].provisional, false);
+  assert.strictEqual(s('Loan').outstanding, 5000 - 2570);
+  assert.strictEqual(s('Wedding').owed, 500);
+  assert.strictEqual(s('Wedding').ask, 120);
+  assert.ok(s("Parents' visit").owed >= 84.5);
+});
+
+test('statement import: decimal commas, Latin-1, sync-compatible IDs and dedupe', () => {
+  const { execFileSync } = require('child_process');
+  const os = require('os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'imp-'));
+  const file = path.join(dir, 'export.xls');
+  fs.writeFileSync(file, Buffer.from('DATA MOVIMENTO\tDESCRIÇÃO\tIMPORTÂNCIA\tMOEDA\r\n2026-11-16\tCOMPRA CAFÉ LISBOA\t-4,20\tEUR\r\n2026-11-17\tTRF. RENT\t-1.200,00\tEUR\r\n2026-11-18\tCOMPRA SUPERMARKT\t-30,10\tEUR\r\n', 'latin1'));
+  const feed = path.join(dir, 'feed.csv');
+  fs.writeFileSync(feed, 'Account,Date,Amount,Currency,Merchant,Description,Transaction ID\nDE Current,2026-11-18,-30.10,EUR,SUPERMARKT,,EB-X20261118000000000001042\n');
+  const out = execFileSync('node', [path.join(__dirname, '../src/import.js'), '--file', file, '--account', 'DE Current', '--id-prefix', 'EB-X', '--anchor', '2026-11-18|SUPERMARKT|1042', '--existing', feed], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  const lines = out.trim().split('\n');
+  assert.strictEqual(lines.length, 3, 'header + 2 new rows; the overlapping row is skipped');
+  assert.ok(lines[1].includes('EB-X20261117000000000001041') && lines[1].includes('-1200'));
+  assert.ok(lines[2].includes('CAFÉ') && lines[2].includes('-4.2'));
+});

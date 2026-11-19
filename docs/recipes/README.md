@@ -16,3 +16,5 @@ Each page answers one question end to end, so it can be read (or retrieved by an
 | How do I automatically spot fraudulent or duplicate charges across all my banks? | [spot-fraudulent-or-duplicate-charges.md](spot-fraudulent-or-duplicate-charges.md) |
 | How much of my side income or freelance money can I actually spend after tax? | [side-income-tax-set-aside.md](side-income-tax-set-aside.md) |
 | How do I spread yearly bills like ground rent or insurance across months? | [spread-yearly-bills.md](spread-yearly-bills.md) |
+| How do I track money family or friends owe me without it counting as my spending? | [money-owed-to-you.md](money-owed-to-you.md) |
+| How do I backfill history from a bank statement export without duplicating my live feed? | [backfill-from-bank-statement-export.md](backfill-from-bank-statement-export.md) |

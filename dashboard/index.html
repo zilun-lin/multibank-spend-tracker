@@ -76,6 +76,12 @@ async function loadFiles(files) {
   if (state.tx) render();
 }
 
+function owedTable(O) {
+  const sum = O.summary.filter(s => s.owed || s.ask || s.repaid).map(s => `<tr><td>${esc(s.name)}</td><td class="num">${fmt(s.owed)}</td><td class="num">${s.ask ? fmt(s.ask) : ''}</td><td class="num">${fmt(s.repaid)}</td><td class="num"><b>${fmt(s.outstanding)}</b></td></tr>`).join('');
+  const ask = O.items.filter(i => i.status === 'ask').slice(0, 10).map(i => `<tr><td>${esc(i.date)}</td><td>${esc(i.merchant)}</td><td>${esc(i.rule)}</td><td class="num">${fmt(i.owed)}</td><td class="muted">${esc(i.note || '')}</td></tr>`).join('');
+  return `<table><tr><th>For</th><th class="num">Owed</th><th class="num">To confirm</th><th class="num">Repaid</th><th class="num">Outstanding</th></tr>${sum}</table>` +
+    (ask ? `<h3 style="margin-top:12px">To confirm</h3><table>${ask}</table>` : '');
+}
 function render() {
   const cfg = E.withDefaults(state.config);
   const asOf = state.config.asOf || state.tx.map(t => t.date).sort().pop();
@@ -83,6 +89,7 @@ function render() {
   const S = E.summarise(L, cfg, asOf);
   const F = E.forecast(L, cfg, asOf);
   const R = E.recurring(L, cfg);
+  const O = E.owedReport(L, cfg);
   const A = E.anomalies(L, cfg, asOf).filter(a => a.severity !== 'low' || a.signals.includes('priceCreep'));
   document.getElementById('sub').textContent = `${state.tx.length} transactions · ${new Set(state.tx.map(t => t.account)).size} accounts · ${new Set(state.tx.map(t => t.currency)).size} currencies · amounts in ${cfg.homeCurrency}`;
   document.getElementById('asof').textContent = 'as of ' + asOf;
@@ -94,6 +101,7 @@ function render() {
     ${tile('Projected month end', fmt(S.forecast.projected), `likely ${fmt(S.forecast.low)}–${fmt(S.forecast.high)} · <span class="${gap > 0 ? 'over' : 'ok'}">${gap > 0 ? fmt(gap) + ' over' : fmt(-gap) + ' under'}</span>`)}
     ${tile('Yearly-pot spend this month', fmt(S.spentAnnualPots), 'judged against yearly allowance')}
     ${tile('Spendable income (last 31 days)', fmt(cf.income), cf.taxSetAside > 0 ? `${fmt(cf.grossIncome)} in − ${fmt(cf.taxSetAside)} set aside for tax · tax pot this year ${fmt(cf.taxReserveYtd)}` : 'after tax set-asides')}
+    ${O.summary.length ? tile('Owed to you', fmt(O.total.outstanding), `${fmt(O.total.repaid)} repaid${O.total.ask ? ` · ${fmt(O.total.ask)} to confirm` : ''} · not counted as your spending`) : ''}
     ${tile('Projected saved this month', fmt(cf.projectedSaved), cf.crossDay ? `<span class="over">goes negative ${cf.crossDay}</span>` : 'stays positive')}
   </div></section>
   <section class="card s8"><h2>Pace this month</h2><div id="pace"></div>
@@ -103,6 +111,7 @@ function render() {
   <section class="card s6"><h2>Kind of spending by month</h2><div id="nature"></div><div class="legend" id="natureLegend"></div></section>
   <section class="card s6"><h2>Largest items this month</h2>${topTable(S.top)}</section>
   <section class="card s6"><h2>Recurring charges</h2>${recTable(R)}</section>
+  ${O.summary.length ? `<section class="card"><h2>Owed to you <span class="muted" style="font-weight:400">— paid on others' behalf, kept out of your budgets</span></h2>${owedTable(O)}</section>` : ''}
   <section class="card"><h2>Check these <span class="muted" style="font-weight:400">— possible fraud, double charges, price rises (last 60 days)</span></h2>${flagTable(A)}</section>
   <section class="card"><h2>Recent transactions</h2>${recentTable(L.filter(r => !r.alloc).slice(0, 40))}</section>`;
   paceChart(document.getElementById('pace'), L, F, S.monthlyBudget, asOf);

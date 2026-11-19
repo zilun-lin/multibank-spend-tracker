@@ -236,3 +236,12 @@ LU-00234,2026-11-15,UK Credit Card,-64.00,GBP,PIZZA PLACE,dup,Lunch Flow
 LU-00235,2026-11-15,UK Credit Card,-64.00,GBP,PIZZA PLACE,dup,Lunch Flow
 EN-00236,2026-11-12,EU Current,-145.00,EUR,VIAGOGO,Tickets,Enable Banking
 LU-00237,2026-11-09,UK Credit Card,-13.99,GBP,NETFLIX.COM,price up,Lunch Flow
+EN-00238,2026-10-06,Multi-currency,-186.00,GBP,BOOKING.COM,Hotel for parents visit,Enable Banking
+LU-00239,2026-10-17,UK Credit Card,-112.00,GBP,RIVERSIDE RESTAURANT,Family dinner,Lunch Flow
+LU-00240,2026-09-05,UK Current,-600.00,GBP,PHOTOGRAPHY STUDIO,Wedding deposit,Lunch Flow
+LU-00241,2026-09-06,UK Current,-1500.00,GBP,COUNTRY MARQUEE HIRE,Wedding deposit,Lunch Flow
+LU-00242,2026-10-15,UK Current,-250.00,GBP,BLOOMS FLORIST,Wedding flowers deposit,Lunch Flow
+EN-00243,2026-09-14,EU Current,2000.00,EUR,CASH DEPOSIT,Repayment,Enable Banking
+EN-00244,2026-09-16,EU Current,-2000.00,EUR,EXCHANGED TO GBP,,Enable Banking
+EN-00245,2026-10-07,EU Current,1500.00,EUR,CASH DEPOSIT,Repayment,Enable Banking
+EN-00246,2026-10-15,EU Current,-1500.00,EUR,EXCHANGED TO GBP,,Enable Banking

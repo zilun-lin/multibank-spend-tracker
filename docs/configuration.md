@@ -43,3 +43,18 @@ node src/cli.js uncategorised --tx export.csv --config config/config.json
 ```
 
 Work down the list. Twenty rules usually cover 90% of spend. Use `\b` word boundaries for short tokens (`\bTFL\b`, so that "NETFLIX" doesn't match).
+
+## Money owed to you (`owed`)
+
+Payments you make for other people are receivables, not spending. See [the recipe](recipes/money-owed-to-you.md) for the full walk-through.
+
+| Key | Meaning |
+|---|---|
+| `me` | Your name as it appears in a shared tracker's "paid by" column (default `Me`). |
+| `category` | Category given to owed payments (default `Paid for others (owed)`); they are not counted in budgets. |
+| `rules[]` | First match wins. `from`/`to` (+`graceDays`, default 1) for a window; `prebookDays` + `prebookCategories` mark earlier bookings as **ask**; `until` + `pattern`/`categories` for standing rules; `ids` for agreed one-offs; `excludePattern`, `account`, `share` (default 1), `status` (default `owed`), `payerCheck`. |
+| `payers[]` | `{ pattern | id, payer }` from a shared tracker. With `payerCheck`, only payments you made are owed; others are **not owed**; missing → **ask**. Also loadable with `cli.js owed --payers file.csv`. |
+| `statuses` | `{ transactionId: "owed" | "ask" | "not owed" }`. Always wins. |
+| `loans[]` | `{ name, date, amount }` in home currency. |
+| `repayments` | `{ pattern, account?, from?, appliesTo? }` credits that are repayments (not income). |
+| `conversions` | `{ pattern?, account?, list? }` how foreign repayments became home currency; valued first in, first out. `list` items: `{ date, foreign, home }`. |

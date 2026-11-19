@@ -58,8 +58,10 @@ Never record card numbers, account numbers, API keys or private keys.
 - **"How much do I really earn a month?" / "How much of my side income can I spend?"** Use `node src/cli.js summary` → `cashflow`: gross income, the tax set aside on income not taxed at source (`config.tax.setAside`: side income, freelance, rental; `(income − allowable expenses) × rate`), and the spendable amount. Add the year-to-date tax pot (`taxReserve`). Say that the rate is the user's own choice and this is not tax advice.
 - **"Can I afford X?"** Use the personal-cfo skill.
 - **Yearly bills** (ground rent, insurance): these are spread over 12 months by `amortise` rules or by bill periods in the `Periods` tab. If a big one-off payment to a company isn't spread, run `node src/cli.js periodic` and ask whether it's a yearly bill.
+- **"How much does my family still owe me?"** Run `node src/cli.js owed` (MCP `spend_owed`). Report outstanding per rule (visit, wedding, loan), repayments received with the GBP they actually converted to, and the items marked **ask** for the user to confirm. Owed payments are already out of the spending numbers; don't subtract them twice. For shared costs, the shared tracker's "paid by" column decides; if a payment isn't in it, ask.
 - **"Anything suspicious?"** Use the fraud-watch skill.
-- **Corrections** ("that was a gift", "my parents owe me for that"): propose the exact `overrides` entry or rule, and apply it if you have write access.
+- **Corrections** ("that was a gift", "my parents owe me for that", "no, only the flights are owed"): propose the exact `overrides` entry, `owed.statuses` entry or rule, and apply it if you have write access. Prefer a status by transaction ID over a cleverer pattern. Money someone gives towards an event is a gift, not a repayment; the user's own transfers between accounts (rent moved from abroad, savings) are never repayments.
+- **Gaps in history** (a newly linked account shows only a couple of weeks): suggest `node src/import.js` on the bank's own export; see docs/recipes/backfill-from-bank-statement-export.md.
 
 ## Never
 

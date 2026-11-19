@@ -10,7 +10,8 @@
     "^TO SAVINGS|^FROM SAVINGS|ROUND ?UP",
     "AMERICAN EXP.*PAYMENT|PAYMENT RECEIVED - THANK YOU",
     "TOP.?UP|SENT FROM REVOLUT|TO MY ACCOUNT|FROM MY ACCOUNT",
-    "TO JANE DOE|FROM JANE DOE"
+    "TO JANE DOE|FROM JANE DOE",
+    "EXCHANGED TO|EXCHANGED FROM"
   ],
   "income": [
     {
@@ -276,5 +277,70 @@
         "question": "Which subscription are you cancelling to make room?"
       }
     ]
+  },
+  "owed": {
+    "$comment": "Money you pay on someone else's behalf is a receivable, not your spending. Rules are matched first-to-last. Statuses you set by transaction ID always win.",
+    "me": "Me",
+    "category": "Paid for others (owed)",
+    "rules": [
+      {
+        "name": "Parents' visit",
+        "from": "2026-10-15",
+        "to": "2026-10-19",
+        "graceDays": 1,
+        "prebookDays": 14,
+        "prebookCategories": [
+          "Travel & trips"
+        ],
+        "categories": [
+          "Eating out",
+          "Travel & trips",
+          "Transport",
+          "Leisure"
+        ],
+        "excludePattern": "BAKERY"
+      },
+      {
+        "name": "Wedding",
+        "until": "2027-06-12",
+        "pattern": "WEDDING|MARQUEE|PHOTOGRAPHY STUDIO|FLORIST",
+        "payerCheck": true
+      },
+      {
+        "name": "Agreed one-offs",
+        "ids": [
+          "example-transaction-id-2"
+        ]
+      }
+    ],
+    "payers": [
+      {
+        "pattern": "MARQUEE",
+        "payer": "Partner's parent"
+      },
+      {
+        "pattern": "PHOTOGRAPHY STUDIO",
+        "payer": "Me"
+      }
+    ],
+    "statuses": {
+      "example-transaction-id-3": "not owed"
+    },
+    "loans": [
+      {
+        "name": "Loan",
+        "date": "2026-08-03",
+        "amount": 5000
+      }
+    ],
+    "repayments": {
+      "pattern": "CASH DEPOSIT|BAREINZAHLUNG",
+      "account": "EU Current",
+      "from": "2026-08-03",
+      "appliesTo": "Loan"
+    },
+    "conversions": {
+      "pattern": "EXCHANGED TO GBP"
+    }
   }
 }

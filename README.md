@@ -30,6 +30,8 @@
 | How do I automatically spot fraudulent or duplicate charges across all my banks? | [recipe](docs/recipes/spot-fraudulent-or-duplicate-charges.md) |
 | How much of my side income or freelance money can I actually spend after tax? | [recipe](docs/recipes/side-income-tax-set-aside.md) |
 | How do I spread yearly bills like ground rent or insurance across months? | [recipe](docs/recipes/spread-yearly-bills.md) |
+| How do I track money family or friends owe me without it counting as my spending? | [recipe](docs/recipes/money-owed-to-you.md) |
+| How do I backfill history from a bank statement export without duplicates? | [recipe](docs/recipes/backfill-from-bank-statement-export.md) |
 | How does this compare with Tiller, Actual, Firefly III, YNAB, Snoop or PocketSmith? | [comparison](docs/alternatives.md) |
 
 ## Who it's for
@@ -58,6 +60,8 @@ It works just as well for a single country. The multi-region pain is simply wher
 | A yearly bill (ground rent, insurance) makes one month look terrible | **Amortisation** spreads it over its 12 months. The billing period is read from the demand email when the name says nothing, and `periodic` suggests candidates. |
 | "Income" that's partly the taxman's | **Tax set-aside**: (income − allowable expenses) × your rate. Shows gross, set aside, spendable and a year-to-date tax pot, for any country's tax year. Built for freelancers, sole traders and side income. |
 | A stolen card or double charge goes unnoticed until the statement | **Fraud watch** across all banks: card testing, duplicates, risky merchant types, spend on normally quiet accounts, new-currency and price-rise alerts. A daily job alerts once per new flag. |
+| Paying for a family visit, a wedding or a loan makes your month look like a spending spree | **Money owed to you**: time-bound and standing rules mark those payments as receivables (out of budgets, still in cash flow). A shared tracker's "paid by" column decides shared costs. Repayments, even cash deposited abroad and converted later, are valued at the rate they actually converted and set against what's outstanding. |
+| A new account only shows two weeks of history | Per-account first sync (~90 days), plus `import.js` to backfill from the bank's own export with IDs that match the live feed. |
 | Should I buy this? | A purchase check against your budget, yearly pots, forecast and your own written policy, with a clear verdict. |
 | When does this month's saving go negative? | A cash-flow line shows money in (including foreign rent net of tax) against money out, and the day savings go negative. |
 
@@ -130,7 +134,8 @@ feeds ─► Google Sheet ─► engine (src/engine.js) ─► dashboard / CLI /
 | Path | What |
 |---|---|
 | `src/engine.js` | Categorisation, refunds, receipts, budgets, forecast, recurring detection, cash flow, explanations |
-| `src/cli.js` | `explain`, `summary`, `check` (can I buy this?), `anomalies` (fraud watch), `periodic` (yearly bills), `ledger`, `recurring`, `uncategorised` |
+| `src/cli.js` | `explain`, `summary`, `check` (can I buy this?), `owed` (money owed to you), `anomalies` (fraud watch), `periodic` (yearly bills), `ledger`, `recurring`, `uncategorised` |
+| `src/import.js` | Backfill from a bank statement export (CSV/TSV/"xls"), decimal commas, Latin-1, feed-compatible IDs, dedupe |
 | `mcp/server.js` | MCP server (stdio) exposing the engine as tools |
 | `config/rules/` | Country rule packs (UK, DE); contributions welcome |
 | `docs/recipes/` | One question per page, end to end |
